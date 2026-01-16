@@ -14,7 +14,12 @@ const port = process.env.PORT || 3000; // Good practice: Allow .env to set port
 // Middleware
 app.use(express.json());
 app.use(helmet())
-app.use(ExpressMongoSanitize())
+app.use(
+  mongoSanitize({
+    allowDots: true,
+    replaceWith: "_",
+  })
+);
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("./public")); //ini untuk folder publicnya bisa diaskses di web browser
