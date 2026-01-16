@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
-import ExpressMongoSanitize from "express-mongo-sanitize";
+import mongoSanitize from "express-mongo-sanitize";
 
 dotenv.config();
 
