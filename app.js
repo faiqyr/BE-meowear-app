@@ -1,82 +1,84 @@
 import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import mongoSanitize from "express-mongo-sanitize";
 import { v2 as cloudinary } from 'cloudinary';
 
+// Import Middlewares
+import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
+
+// Import Routers
+import authRouter from "./routes/authRouter.js";
+import ProductRouter from "./routes/productRouter.js";
+import OrderRouter from "./routes/orderRouter.js";
+
 dotenv.config();
 
 const app = express();
-// const port = process.env.PORT || 3000; // Dipindahkan ke bawah agar tidak conflict dengan Vercel
 
-    cloudinary.config({ 
-        cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
-        api_key: process.env.CLOUDINARY_API_KEY, 
-        api_secret: process.env.CLOUDINARY_API_SECRET // Click 'View API Keys' above to copy your API secret
-    });
+// Cloudinary Configuration
+cloudinary.config({ 
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
+    api_key: process.env.CLOUDINARY_API_KEY, 
+    api_secret: process.env.CLOUDINARY_API_SECRET 
+});
 
-// Middleware
+// --- DATABASE CONNECTION LOGIC (Optimized for Serverless) ---
+const connectDB = async () => {
+  // Jika sudah konek, jangan buat koneksi baru
+  if (mongoose.connection.readyState >= 1) return;
+
+  try {
+    await mongoose.connect(process.env.DATABASE);
+    console.log("✅ MongoDB Connected");
+  } catch (err) {
+    console.error("❌ MongoDB Connection Error:", err);
+    // Jangan biarkan aplikasi jalan jika DB gagal di serverless
+    throw err; 
+  }
+};
+
+// --- MIDDLEWARES ---
 app.use(express.json());
 app.use(helmet());
+app.use(cookieParser());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static("./public")); 
 
-/* KODE SEBELUMNYA (MENYEBABKAN ERROR 500 DI VERCEL):
-  app.use(
-    mongoSanitize({
-      allowDots: true,
-      replaceWith: "_",
-    })
-  );
-  ALASAN: Vercel melindungi properti 'query'. Middleware ini mencoba mengubahnya secara paksa.
-*/
-
-// PERBAIKAN: Sanitasi manual hanya pada body untuk keamanan tanpa merusak sistem Vercel
+// Manual Sanitization (Aman untuk Vercel Proxy)
 app.use((req, res, next) => {
   if (req.body) req.body = mongoSanitize.sanitize(req.body);
   next();
 });
 
-app.use(cookieParser());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static("./public")); 
+// Middleware untuk memastikan DB konek sebelum menjalankan route apapun
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    res.status(500).json({ message: "Database connection failed", error: err.message });
+  }
+});
 
-import authRouter from "./routes/authRouter.js";
-import ProductRouter from "./routes/productRouter.js";
-import OrderRouter from "./routes/orderRouter.js";
-
-// Parent Router
+// --- ROUTES ---
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/product", ProductRouter);
 app.use("/api/v1/order", OrderRouter);
 
+// Error Handling
 app.use(notFound);
 app.use(errorHandler);
 
-// Server Connection DB
-/*
-  KODE SEBELUMNYA:
-  mongoose.connect(process.env.DATABASE).then(() => {
-     app.listen(port, ...)
-  })
-  ALASAN: Di Vercel (Serverless), app.listen tidak boleh dibungkus di dalam promise 
-  karena Vercel perlu mendeteksi objek 'app' segera saat cold start.
-*/
-
-// PERBAIKAN: Jalankan koneksi DB secara independen
-mongoose
-  .connect(process.env.DATABASE)
-  .then(() => console.log("✅ Database Connected"))
-  .catch((err) => console.log("❌ Database Connection Error:", err));
-
-// PERBAIKAN: Gunakan app.listen hanya untuk LOCAL development
+// --- SERVER START (Local Only) ---
 if (process.env.NODE_ENV !== "production") {
   const port = process.env.PORT || 3000;
   app.listen(port, () => {
-    console.log(`🚀 App listening on port ${port}`);
+    console.log(`🚀 Local Server running on port ${port}`);
   });
 }
 
-// WAJIB UNTUK VERCEL: Export default agar Vercel mengenali aplikasi Express Anda
+// --- VERCEL EXPORT ---
 export default app;
