@@ -116,7 +116,7 @@ export const callbackPayment = asyncHandler(async (req, res) => {
   let transactionStatus = statusResponse.transaction_status;
   let fraudStatus = statusResponse.fraud_status;
 
-  const orderData = await Order.findById(orderId);
+  const orderData = await Order.findOne({ _id: orderId });
 
   if (!orderData) {
     res.status(404);
