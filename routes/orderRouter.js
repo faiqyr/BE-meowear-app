@@ -1,5 +1,5 @@
 import express from "express";
-import { CreateOrder, AllOrder, CurrentUserOrder, DetailOrder } from "../controllers/OrderController.js";
+import { CreateOrder, AllOrder, CurrentUserOrder, DetailOrder, callbackPayment } from "../controllers/OrderController.js";
 import { adminMiddleware, protectedMiddleware } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
@@ -20,6 +20,8 @@ router.get('/:id', protectedMiddleware, adminMiddleware, DetailOrder)
 // cuman bisa diakses oleh user yang auth
 router.get('/current/user', protectedMiddleware, CurrentUserOrder)
 
+// post /api/v1/order/callback/midtrans
+router.post('/callback/midtrans', callbackPayment)
 
 
 
