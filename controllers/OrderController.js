@@ -5,7 +5,6 @@ import midtransClient from "midtrans-client";
 import dotenv from "dotenv";
 dotenv.config();
 
-// Create Snap API instance
 let snap = new midtransClient.Snap({
   isProduction: false,
   serverKey: process.env.MIDTRANS_SERVER,
@@ -23,29 +22,26 @@ export const CreateOrder = asyncHandler(async (req, res) => {
   let total = 0;
 
   for (const cart of cartItem) {
-    const productData = await Product.findOne({ _id: cart.product });
+    const productData = await Product.findById(cart.product);
     if (!productData) {
       res.status(404);
-      throw new Error("id product tidak ditemukan");
+      throw new Error(`Product ID ${cart.product} tidak ditemukan`);
     }
 
     const { name, price, _id } = productData;
-    const singleProduct = {
+    orderItem.push({
       quantity: cart.quantity,
       name,
       price,
       product: _id,
-    };
+    });
 
-    const shortName = name.substring(0, 30);
-    const singleProductMidtrans = {
+    orderMidtrans.push({
       quantity: cart.quantity,
-      name: shortName,
+      name: name.substring(0, 30),
       price,
-      id: _id,
-    };
-    orderItem = [...orderItem, singleProduct];
-    orderMidtrans = [...orderMidtrans, singleProductMidtrans];
+      id: _id.toString(),
+    });
 
     total += cart.quantity * price;
   }
@@ -62,15 +58,15 @@ export const CreateOrder = asyncHandler(async (req, res) => {
 
   let parameter = {
     transaction_details: {
-      order_id: order._id,
+      order_id: order._id.toString(), // Midtrans expects a string
       gross_amount: total,
     },
     item_details: orderMidtrans,
     customer_details: {
       first_name: firstName,
       last_name: lastName,
-      email: email,
-      phone: phone,
+      email,
+      phone,
     },
   };
 
@@ -84,76 +80,72 @@ export const CreateOrder = asyncHandler(async (req, res) => {
   });
 });
 
+// --- UPDATED CALLBACK LOGIC ---
+export const callbackPayment = asyncHandler(async (req, res) => {
+  try {
+    const statusResponse = await snap.transaction.notification(req.body);
+    const { order_id, transaction_status, fraud_status } = statusResponse;
+
+    console.log(`Processing Callback for Order: ${order_id} - Status: ${transaction_status}`);
+
+    // Find the order
+    const orderData = await Order.findById(order_id);
+
+    if (!orderData) {
+      return res.status(404).send("Order not found");
+    }
+
+    // 1. If status is already success, don't do anything (Prevent double stock deduction)
+    if (orderData.status === "success") {
+      return res.status(200).send("Order already processed");
+    }
+
+    // 2. Logic for Success (Settlement for VA/E-wallet, Capture for CC)
+    if (transaction_status === "capture" || transaction_status === "settlement") {
+      if (fraud_status === "accept" || !fraud_status) {
+        
+        // Update stock in parallel for speed
+        const updateStockPromises = orderData.itemsDetail.map(async (item) => {
+          return Product.findByIdAndUpdate(item.product, {
+            $inc: { stock: -item.quantity }
+          });
+        });
+
+        await Promise.all(updateStockPromises);
+        orderData.status = "success";
+      }
+    } 
+    // 3. Logic for Failure
+    else if (["cancel", "deny", "expire"].includes(transaction_status)) {
+      orderData.status = "failed";
+    } 
+    // 4. Logic for Pending
+    else if (transaction_status === "pending") {
+      orderData.status = "pending";
+    }
+
+    await orderData.save();
+    return res.status(200).send("OK");
+
+  } catch (error) {
+    console.error("Midtrans Callback Error:", error.message);
+    // Return 200 even on error to stop Midtrans from retrying and spamming your logs
+    return res.status(200).send("Callback Error Handled");
+  }
+});
+
+// Other controllers...
 export const AllOrder = asyncHandler(async (req, res) => {
   const orders = await Order.find();
-
-  return res.status(200).json({
-    data: orders,
-    message: "Berhasil Tampil Semua Order Product",
-  });
+  return res.status(200).json({ data: orders, message: "Berhasil Tampil Semua Order Product" });
 });
 
 export const DetailOrder = asyncHandler(async (req, res) => {
   const order = await Order.findById(req.params.id);
-
-  return res.status(200).json({
-    data: order,
-    message: "Berhasil Tampil Detail Order Product",
-  });
+  return res.status(200).json({ data: order, message: "Berhasil Tampil Detail Order Product" });
 });
+
 export const CurrentUserOrder = asyncHandler(async (req, res) => {
   const order = await Order.find({ user: req.user.id });
-
-  return res.status(200).json({
-    data: order,
-    message: "Berhasil Tampil Current User Order Product",
-  });
-});
-
-export const callbackPayment = asyncHandler(async (req, res) => {
-  const statusResponse = await snap.transaction.notification(req.body);
-  let orderId = statusResponse.order_id;
-  let transactionStatus = statusResponse.transaction_status;
-  let fraudStatus = statusResponse.fraud_status;
-
-  const orderData = await Order.findOne({ _id: orderId });
-
-  if (!orderData) {
-    res.status(404);
-    throw new Error("Order tidak ditemukan");
-  }
-
-  // Sample transactionStatus handling logic
-
-  if (transactionStatus == "capture" || transactionStatus == "settlement") {
-    if (fraudStatus == "accept") {
-      const orderProduct = orderData.itemsDetail;
-
-      for (const itemProduct of orderProduct) {
-        const productData = await Product.findById(itemProduct.product);
-
-        if (!productData) {
-          res.status(404);
-          throw new Error("Product tidak ditemukan");
-        }
-        productData.stock = productData.stock - itemProduct.quantity;
-        await productData.save();
-      }
-      orderData.status = "success";
-    }
-  } else if (
-    transactionStatus == "cancel" ||
-    transactionStatus == "deny" ||
-    transactionStatus == "expire"
-  ) {
-    // TODO set transaction status on your database to 'failure'
-    // and response with 200 OK
-    orderData.status = "failed";
-  } else if (transactionStatus == "pending") {
-    // TODO set transaction status on your database to 'pending' / waiting payment
-    // and response with 200 OK
-    orderData.status = "pending";
-  }
-  await orderData.save();
-  return res.status(200).send("Payment notif berhasil");
+  return res.status(200).json({ data: order, message: "Berhasil Tampil Current User Order Product" });
 });
