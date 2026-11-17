@@ -9,5 +9,10 @@
       "source": "/(.*)",
       "destination": "/client/dist/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "server/app.js": {
+      "maxDuration": 30
+    }
+  }
 }
