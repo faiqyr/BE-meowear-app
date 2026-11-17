@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 node_modules/
 client/node_modules/
 server/node_modules/
@@ -9,3 +10,7 @@ dist/
 build/
 .vscode/
 .idea/
+=======
+node_modules
+.env
+>>>>>>> 0d6777d00ef0d348965def2bb59b19f7746cb092
