@@ -1,6 +1,11 @@
 # 🐱 Meowear App - E-Commerce Pakaian Kucing Fullstack
 
+[![Deployment Status](https://img.shields.io/badge/Status-Live%20on%20Vercel-brightgreen?style=for-the-badge&logo=vercel)](https://be-meowear-app.vercel.app)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-black?style=for-the-badge&logo=github)](https://github.com/faiqyr/BE-meowear-app)
+
 Aplikasi e-commerce modern berbasis web untuk memenuhi kebutuhan pakaian, aksesoris, dan perlengkapan fashion kucing kesayangan Anda. Dibangun menggunakan arsitektur **Fullstack Monorepo** (Frontend Modern dengan Vite/React & Backend RESTful API dengan Express.js serta Database MongoDB).
+
+🌐 **Live Website:** [https://be-meowear-app.vercel.app](https://be-meowear-app.vercel.app)
 
 ---
 
@@ -46,7 +51,7 @@ Aplikasi e-commerce modern berbasis web untuk memenuhi kebutuhan pakaian, akseso
 BE-meowear-app/
 ├── api/                  # Vercel Serverless Function entry point
 │   ├── index.js
-│   └── package.json
+│   ├── package.json
 ├── client/               # Frontend React (Vite)
 │   ├── src/
 │   │   ├── components/   # Komponen UI (Header, Cart, Form, dll.)
@@ -96,3 +101,15 @@ BE-meowear-app/
    ```bash
    npm run dev
    ```
+
+---
+
+## 🔒 Catatan Keamanan
+Repository ini aman dari kebocoran data rahasia karena file konfigurasi lingkungan (`.env`) dan folder `node_modules` telah diabaikan menggunakan `.gitignore`. Semua kredensial produksi diatur langsung melalui panel *Environment Variables* di Vercel.
+
+---
+
+## 👨‍💻 Author & Maintainer
+* **GitHub:** [@faiqyr](https://github.com/faiqyr)
+* **Repository:** [BE-meowear-app](https://github.com/faiqyr/BE-meowear-app)
+* **Live Demo:** [https://be-meowear-app.vercel.app](https://be-meowear-app.vercel.app)
